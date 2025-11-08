@@ -1,0 +1,24 @@
+#!/bin/bash
+# Commit message hook
+# This hook validates commit message format
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# Minimum commit message length (excluding comments)
+if [ ${#commit_msg} -lt 10 ]; then
+    echo "❌ Commit message is too short. Please write a meaningful message."
+    exit 1
+fi
+
+# Optional: Check for conventional commit format
+# Uncomment below to enforce conventional commits (feat:, fix:, docs:, etc.)
+# if ! echo "$commit_msg" | grep -qE "^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .{1,}"; then
+#     echo "❌ Commit message does not follow conventional commit format."
+#     echo "   Format: <type>(<scope>): <subject>"
+#     echo "   Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert"
+#     exit 1
+# fi
+
+exit 0
+

@@ -1,0 +1,25 @@
+#!/bin/bash
+# Pre-commit hook for Go project
+# This hook runs linting checks before allowing a commit
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if we're in a git repository
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "❌ Not in a git repository"
+    exit 1
+fi
+
+# Run linting
+echo "📝 Running linter..."
+cd "$(git rev-parse --show-toplevel)"
+if ! make lint; then
+    echo "❌ Linting failed. Please fix the errors before committing."
+    exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"
+exit 0
+
