@@ -8,6 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// DropTable drops one or more tables from the database.
+// It validates that all table names are strings and that the tables exist before attempting to drop them.
+// Returns an error if any table name is not a string or if any table does not exist.
 func DropTable(tx *gorm.DB, tableNames ...interface{}) error {
 	for _, tableName := range tableNames {
 		if reflect.TypeOf(tableName).Kind() != reflect.String {
@@ -20,6 +23,10 @@ func DropTable(tx *gorm.DB, tableNames ...interface{}) error {
 	return tx.Migrator().DropTable(tableNames...)
 }
 
+// CreateDatabase creates a new database with the specified name.
+// It supports PostgreSQL and MySQL databases. SQLite is not supported as it uses file-based databases.
+// If the database already exists, it will print a warning and return nil without error.
+// Returns an error if the database type is not supported or if creation fails.
 func CreateDatabase(db *gorm.DB, dbName string) error {
 	dialectorName := db.Dialector.Name()
 
@@ -79,6 +86,11 @@ func createMySQLDatabase(db *gorm.DB, dbName string) error {
 	return nil
 }
 
+// DeleteDatabase deletes a database with the specified name.
+// It supports PostgreSQL and MySQL databases. SQLite is not supported as it uses file-based databases.
+// For PostgreSQL, it terminates all active connections before dropping the database.
+// If the database does not exist, it will print a warning and return nil without error.
+// Returns an error if the database type is not supported or if deletion fails.
 func DeleteDatabase(db *gorm.DB, dbName string) error {
 	dialectorName := db.Dialector.Name()
 

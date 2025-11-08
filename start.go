@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// Params holds configuration parameters for database operations.
+// It contains fields for action type, target, output path, and database connection URLs.
 type Params struct {
 	Action             string
 	Target             string
@@ -19,6 +21,11 @@ type Params struct {
 	TargetDatabaseName string
 }
 
+// Start initializes and runs the CLI application for managing database migrations.
+// It loads environment variables from a .env file if present, sets up CLI commands for database operations,
+// and handles command-line arguments. Supported commands include create-db, delete-db, up, down, gen, status, and regression.
+// The migrations parameter should contain all migration definitions to be managed.
+// The getGormFromURL function is used to create a GORM database connection from a connection URL string.
 func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error)) error {
 
 	if err := godotenv.Load(); err != nil {

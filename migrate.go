@@ -7,14 +7,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// MigrationsHistory represents a record in the migrations table that tracks applied migrations.
+// It stores the migration ID as the primary key.
 type MigrationsHistory struct {
 	ID string `gorm:"primaryKey"`
 }
 
+// TableName returns the name of the database table used to store migration history.
+// It implements the gorm.Tabler interface to customize the table name.
 func (MigrationsHistory) TableName() string {
 	return "migrations"
 }
 
+// Migration is a type alias for gormigrate.Migration.
+// It represents a single database migration with its ID, Up, and Down functions.
 type Migration = gormigrate.Migration
 
 func getMigrator(db *gorm.DB, migrations []*Migration) *gormigrate.Gormigrate {
@@ -22,14 +28,12 @@ func getMigrator(db *gorm.DB, migrations []*Migration) *gormigrate.Gormigrate {
 		TableName:                 "migrations",
 		IDColumnName:              "id",
 		IDColumnSize:              255,
-		UseTransaction:            false, // 必须关闭事务，防止表重建数据丢失
+		UseTransaction:            false, // Must disable transaction to prevent data loss during table recreation
 		ValidateUnknownMigrations: true,
 	}, migrations)
 }
 
-// ============================================================
-// 关键逻辑：执行前后对比迁移差异
-// ============================================================
+// runMigrateWithDiff executes migrations and compares the differences before and after execution.
 func runMigrateWithDiff(db *gorm.DB, migrations []*Migration) error {
 	if err := db.AutoMigrate(&MigrationsHistory{}); err != nil {
 		return fmt.Errorf("failed to migrate migrations table: %w", err)
@@ -63,11 +67,7 @@ func runMigrateWithDiff(db *gorm.DB, migrations []*Migration) error {
 	return nil
 }
 
-// ============================================================
-// 工具函数：查询迁移记录 + 差异对比
-// ============================================================
-
-// getAppliedIDs 读取当前数据库中 migrations 表的 ID 集合
+// getAppliedIDs reads the set of migration IDs from the migrations table in the current database.
 func getAppliedIDs(db *gorm.DB) map[string]bool {
 	var applied []MigrationsHistory
 	ids := make(map[string]bool)
@@ -81,7 +81,7 @@ func getAppliedIDs(db *gorm.DB) map[string]bool {
 	return ids
 }
 
-// findNewMigrations 返回 after 相比 before 新增的迁移 ID
+// findNewMigrations returns the migration IDs that are new in after compared to before.
 func findNewMigrations(before, after map[string]bool) []string {
 	var diff []string
 	for id := range after {
@@ -92,9 +92,7 @@ func findNewMigrations(before, after map[string]bool) []string {
 	return diff
 }
 
-// ============================================================
-// 打印当前状态（Applied / Pending）
-// ============================================================
+// printMigrationStatus prints the current migration status (Applied / Pending).
 func printMigrationStatus(db *gorm.DB, migrations []*Migration, forcePrint bool) {
 	if err := db.AutoMigrate(&MigrationsHistory{}); err != nil {
 		fmt.Println("Failed to migrate migrations table:", err)

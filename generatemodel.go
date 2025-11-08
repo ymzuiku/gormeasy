@@ -9,16 +9,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// generateGormModel 从数据库结构反向生成 GORM model 文件
+// generateGormCode generates GORM model files by reverse engineering the database structure.
 func generateGormCode(db *gorm.DB, basePath string) error {
 	modelPath := filepath.Join(basePath)
 
-	// 安全保护：防止误删项目根目录
+	// Safety check: prevent accidental deletion of project root directory
 	if basePath == "." || basePath == "/" {
 		return fmt.Errorf("refusing to generate into critical directory: %s", basePath)
 	}
 
-	// 查询数据库所有表
+	// Query all tables in the database
 	tables, err := db.Migrator().GetTables()
 	if err != nil {
 		return fmt.Errorf("failed to list tables: %w", err)
@@ -30,11 +30,11 @@ func generateGormCode(db *gorm.DB, basePath string) error {
 
 	fmt.Println("Generating GORM code for tables:", tables)
 
-	// ======== 生成 model 层 ========
+	// Generate model layer
 	gModel := gen.NewGenerator(gen.Config{
 		OutPath:      modelPath,
 		ModelPkgPath: "model",
-		Mode:         gen.WithoutContext, // 纯结构体
+		Mode:         gen.WithoutContext, // Pure structs only
 	})
 	gModel.UseDB(db)
 	for _, table := range tables {
