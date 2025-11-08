@@ -2,6 +2,14 @@
 
 A simple and easy-to-use database migration tool for GORM, built on top of [gormigrate](https://pkg.go.dev/github.com/go-gormigrate/gormigrate/v2@v2.1.5). Gorm Easy provides a CLI interface to manage database migrations with ease. It supports all databases that GORM supports, including PostgreSQL, MySQL, SQLite, SQL Server, and more.
 
+## Installation
+
+Install Gorm Easy in your Go project:
+
+```bash
+go get github.com/ymzuiku/gormeasy
+```
+
 ## Features
 
 - 🚀 Simple CLI interface for database migrations
@@ -10,12 +18,6 @@ A simple and easy-to-use database migration tool for GORM, built on top of [gorm
 - 🗄️ Database creation and deletion
 - 🤖 GORM model generation from database schema
 - ✅ Migration testing utilities
-
-## Installation
-
-```bash
-go get github.com/ymzuiku/gormeasy
-```
 
 ## Quick Start
 
@@ -27,7 +29,9 @@ Create a main file that initializes Gorm Easy:
 package main
 
 import (
+    "fmt"
     "log"
+    "net/http"
     "github.com/ymzuiku/gormeasy"
     "gorm.io/driver/postgres"  // or mysql, sqlite, sqlserver, etc.
     "gorm.io/gorm"
@@ -56,6 +60,17 @@ func main() {
         // return gorm.Open(sqlite.Open(url)) // For SQLite
     }); err != nil {
         log.Fatalf("failed to start gormeasy: %v", err)
+    }
+
+    // After gormeasy commands complete, start your application server
+    // This allows you to run migrations and then start your HTTP server
+    http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintf(w, "pong")
+    })
+
+    log.Println("Server starting on :8080")
+    if err := http.ListenAndServe(":8080", nil); err != nil {
+        log.Fatalf("failed to start server: %v", err)
     }
 }
 ```
@@ -228,6 +243,26 @@ DATABASE_URL=postgres://postgres:the_password@localhost:9433/gormeasy_example?ss
 cd example
 go run main.go up
 ```
+
+### Running as a Service
+
+You can combine migration commands with your application server. When `gormeasy.Start()` completes (e.g., when using `--no-exit` flag or when no command matches), your application code continues to execute. This allows you to:
+
+1. Run migrations on startup
+2. Start your HTTP server after migrations complete
+
+**Example usage:**
+
+```bash
+# Run migrations and then start the server
+go run example/main.go up --no-exit
+
+# Or simply run without arguments to start the server directly
+# (if no command matches, gormeasy.Start returns and your server code executes)
+go run example/main.go
+```
+
+The example includes a simple HTTP server that starts after `gormeasy.Start()` completes. Visit `http://localhost:8080/ping` to test the server.
 
 ## Development
 

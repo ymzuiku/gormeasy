@@ -26,9 +26,23 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 		fmt.Printf("Warning: .env file not found: %v\n", err)
 	}
 
+	// Check if help is explicitly requested
+	showHelp := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--help" || arg == "-h" || arg == "help" {
+			showHelp = true
+			break
+		}
+	}
+
 	app := &cli.App{
-		Name:  "easymigrate",
-		Usage: "Manage PostgreSQL databases and migrations",
+		Name:     "easymigrate",
+		Usage:    "Manage PostgreSQL databases and migrations",
+		HideHelp: !showHelp, // Only hide help if not explicitly requested
+		Action: func(c *cli.Context) error {
+			// When no command is provided, silently return to allow the application to continue
+			return nil
+		},
 		Commands: []*cli.Command{
 			{
 				Name:  "create-db",
@@ -239,10 +253,32 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		if !strings.Contains(err.Error(), "flag provided but not defined") {
-			fmt.Println("Error:", err)
+		errStr := err.Error()
+		// If help was explicitly requested, show help and exit
+		if showHelp && strings.Contains(errStr, "help requested") {
+			// Show help by running help command
+			helpArgs := []string{os.Args[0], "help"}
+			if helpErr := app.Run(helpArgs); helpErr != nil {
+				// If help command also fails, just exit
+				os.Exit(1)
+			}
+			os.Exit(0)
 		}
+		// Suppress help-related errors and unknown command errors when no command is provided
+		if strings.Contains(errStr, "flag provided but not defined") ||
+			strings.Contains(errStr, "No help topic") ||
+			(strings.Contains(errStr, "command") && strings.Contains(errStr, "not found")) {
+			// Silently return for unknown command errors (but not explicit help requests)
+			return nil
+		}
+		fmt.Println("Error:", err)
 		return err
 	}
+
+	// If help was requested and app.Run succeeded (help was shown), exit
+	if showHelp {
+		os.Exit(0)
+	}
+
 	return nil
 }

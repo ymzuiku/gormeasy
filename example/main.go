@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/ymzuiku/gormeasy"
@@ -81,5 +83,16 @@ func main() {
 		return gorm.Open(postgres.Open(url))
 	}); err != nil {
 		log.Fatalf("failed to start gormeasy: %v", err)
+	}
+
+	// Start HTTP server after gormeasy commands
+	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "pong")
+	})
+
+	log.Println("Server starting on :8080")
+	log.Println("Visit http://localhost:8080/ping to test")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatalf("failed to start server: %v", err)
 	}
 }
