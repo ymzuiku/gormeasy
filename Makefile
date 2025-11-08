@@ -35,8 +35,9 @@ gen:
 	@make up
 	@go run example/main.go gen --out=generated/model
 
-check-db:
+test:
 	@go run example/main.go test --test-db-name=migrate_test --owner-db-url=postgres://postgres:the_password@localhost:9433/postgres?sslmode=disable --test-db-url=postgres://postgres:the_password@localhost:9433/migrate_test?sslmode=disable
+
 
 again:
 	@make reset-db

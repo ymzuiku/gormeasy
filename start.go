@@ -111,8 +111,10 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 					}
 					err = runMigrateWithDiff(db, migrations)
 					if err != nil {
+						printMigrationStatus(db, migrations, false)
 						return err
 					}
+					printMigrationStatus(db, migrations, false)
 					if !noExit {
 						os.Exit(0)
 					}
@@ -139,20 +141,24 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 					m := getMigrator(db, migrations)
 					if id != "" {
 						if err := m.RollbackTo(id); err != nil {
+							printMigrationStatus(db, migrations, false)
 							return fmt.Errorf("failed to rollback to migration: %w", err)
 						}
 						fmt.Printf("✅ Rollback to migration: %s complete.\n", id)
 					} else if all {
 						if err := rollbackAllMigrations(m); err != nil {
+							printMigrationStatus(db, migrations, false)
 							return fmt.Errorf("failed to rollback all migrations: %w", err)
 						}
 						fmt.Printf("✅ Rollback all migrations complete.\n")
 					} else {
 						if err := m.RollbackLast(); err != nil {
+							printMigrationStatus(db, migrations, false)
 							return fmt.Errorf("rollback failed: %w", err)
 						}
 						fmt.Println("✅ Rollback last complete.")
 					}
+					printMigrationStatus(db, migrations, false)
 					os.Exit(0)
 					return nil
 				},

@@ -7,8 +7,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type migrationsModel struct {
+type MigrationsHistory struct {
 	ID string `gorm:"primaryKey"`
+}
+
+func (MigrationsHistory) TableName() string {
+	return "migrations"
 }
 
 type Migration = gormigrate.Migration
@@ -27,7 +31,7 @@ func getMigrator(db *gorm.DB, migrations []*Migration) *gormigrate.Gormigrate {
 // 关键逻辑：执行前后对比迁移差异
 // ============================================================
 func runMigrateWithDiff(db *gorm.DB, migrations []*Migration) error {
-	if err := db.AutoMigrate(&migrationsModel{}); err != nil {
+	if err := db.AutoMigrate(&MigrationsHistory{}); err != nil {
 		return fmt.Errorf("failed to migrate migrations table: %w", err)
 	}
 
@@ -65,7 +69,7 @@ func runMigrateWithDiff(db *gorm.DB, migrations []*Migration) error {
 
 // getAppliedIDs 读取当前数据库中 migrations 表的 ID 集合
 func getAppliedIDs(db *gorm.DB) map[string]bool {
-	var applied []migrationsModel
+	var applied []MigrationsHistory
 	ids := make(map[string]bool)
 	if err := db.Find(&applied).Error; err != nil {
 		fmt.Println("Failed to read migration table:", err)
@@ -92,7 +96,7 @@ func findNewMigrations(before, after map[string]bool) []string {
 // 打印当前状态（Applied / Pending）
 // ============================================================
 func printMigrationStatus(db *gorm.DB, migrations []*Migration, forcePrint bool) {
-	if err := db.AutoMigrate(&migrationsModel{}); err != nil {
+	if err := db.AutoMigrate(&MigrationsHistory{}); err != nil {
 		fmt.Println("Failed to migrate migrations table:", err)
 		return
 	}
