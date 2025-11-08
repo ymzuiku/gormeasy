@@ -1,6 +1,6 @@
 # Gorm Easy
 
-A simple and easy-to-use database migration tool for GORM, built on top of [gormigrate](https://pkg.go.dev/github.com/go-gormigrate/gormigrate/v2@v2.1.5). Gorm Easy provides a CLI interface to manage database migrations with ease. It supports all databases that GORM supports, including PostgreSQL, MySQL, SQLite, SQL Server, and more.
+A simple and easy-to-use database migration tool for GORM, built on top of [gormigrate](https://pkg.go.dev/github.com/go-gormigrate/gormigrate/v2). Gorm Easy provides a CLI interface to manage database migrations with ease. It supports all databases that GORM supports, including PostgreSQL, MySQL, SQLite, SQL Server, and more.
 
 ## Installation
 
@@ -36,10 +36,11 @@ import (
     "github.com/ymzuiku/gormeasy"
     "gorm.io/driver/postgres"  // or mysql, sqlite, sqlserver, etc.
     "gorm.io/gorm"
+    "internal/migration" // we will create it
 )
 
 func main() {
-    if err := gormeasy.Start(getMigrations(), func(url string) (*gorm.DB, error) {
+    if err := gormeasy.Start(migration.GetMigrations(), func(url string) (*gorm.DB, error) {
         // Use the appropriate GORM driver for your database
         return gorm.Open(postgres.Open(url))  // For PostgreSQL
         // return gorm.Open(mysql.Open(url))  // For MySQL
@@ -424,6 +425,28 @@ go get -u ./...
 go mod tidy
 ```
 
+## Dependencies
+
+Gorm Easy is built on top of the following excellent libraries:
+
+### Core Libraries
+
+- **[GORM](https://gorm.io/)** - The fantastic ORM library for Go, providing database abstraction and query building
+- **[GORM Gen](https://gorm.io/gen/)** - Code generation tool for GORM, used to generate model structs from database schema
+- **[gormigrate](https://github.com/go-gormigrate/gormigrate)** - Database migration library for GORM that provides migration management and versioning
+
+### Supporting Libraries
+
+- **[urfave/cli](https://github.com/urfave/cli)** - CLI framework for building command-line applications
+- **[godotenv](https://github.com/joho/godotenv)** - Loads environment variables from `.env` files
+- **[GORM Drivers](https://gorm.io/docs/connecting_to_the_database.html)** - Database drivers for PostgreSQL, MySQL, SQLite, SQL Server, and more
+
+### Links
+
+- [gormigrate Documentation](https://pkg.go.dev/github.com/go-gormigrate/gormigrate/v2)
+- [GORM Documentation](https://gorm.io/docs/)
+- [GORM Gen Documentation](https://gorm.io/gen/)
+
 ## License
 
-See LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
