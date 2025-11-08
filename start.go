@@ -158,7 +158,9 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 					if err != nil {
 						return fmt.Errorf("failed to open database: %w", err)
 					}
-					generateGormCode(db, out)
+					if err := generateGormCode(db, out); err != nil {
+						return fmt.Errorf("failed to generate GORM code: %w", err)
+					}
 					os.Exit(0)
 					return nil
 				},

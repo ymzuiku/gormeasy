@@ -24,7 +24,9 @@ func generateGormCode(db *gorm.DB, basePath string) error {
 		return fmt.Errorf("failed to list tables: %w", err)
 	}
 
-	clearDirectory(basePath)
+	if err := clearDirectory(basePath); err != nil {
+		return fmt.Errorf("failed to clear directory: %w", err)
+	}
 
 	fmt.Println("Generating GORM code for tables:", tables)
 
