@@ -49,7 +49,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				Usage: "Create a PostgreSQL database if it does not exist",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "db-name", Usage: "Name of the database to create", Required: true},
-					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DEV_DATABASE_URL"}},
+					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"OWNER_DATABASE_URL"}},
 				},
 				Action: func(c *cli.Context) error {
 					databaseURL := c.String("owner-db-url")
@@ -73,7 +73,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				Usage: "Delete a PostgreSQL database if it exists",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "db-name", Usage: "Name of the database to delete", Required: true},
-					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: true, EnvVars: []string{"DEV_DATABASE_URL"}},
+					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: true, EnvVars: []string{"OWNER_DATABASE_URL"}},
 				},
 				Action: func(c *cli.Context) error {
 
@@ -98,7 +98,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				Name:  "up",
 				Usage: "Migrate the database up",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DEV_DATABASE_URL"}},
+					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
 					&cli.BoolFlag{Name: "no-exit", Usage: "When success, do not exit", Required: false},
 				},
 				Action: func(c *cli.Context) error {
@@ -125,7 +125,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				Name:  "down",
 				Usage: "Migrate the database down",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DEV_DATABASE_URL"}},
+					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
 					&cli.StringFlag{Name: "id", Usage: "Rollback to specific migration ID", Required: false},
 					&cli.BoolFlag{Name: "all", Usage: "Rollback all migrations", Required: false},
 				},
@@ -167,7 +167,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				Name:  "gen",
 				Usage: "Generate GORM models from database",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DEV_DATABASE_URL"}},
+					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
 					&cli.StringFlag{Name: "out", Usage: "Output path for generated models", Required: true},
 				},
 				Action: func(c *cli.Context) error {
@@ -189,7 +189,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				Name:  "status",
 				Usage: "Show the current migration status",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DEV_DATABASE_URL"}},
+					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
 				},
 				Action: func(c *cli.Context) error {
 					databaseURL := c.String("db-url")
@@ -204,26 +204,38 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 				},
 			},
 			{
-				Name:  "test",
-				Usage: "Test all migration and rollback",
+				Name:  "regression",
+				Usage: "Run regression test for all migrations and rollbacks",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: true, EnvVars: []string{"DEV_DATABASE_URL"}},
-					&cli.StringFlag{Name: "test-db-url", Usage: "Target database connection URL", Required: true, EnvVars: []string{"TARGET_DATABASE_URL"}},
-					&cli.StringFlag{Name: "test-db-name", Usage: "Run Test database name", Required: true},
+					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: true, EnvVars: []string{"OWNER_DATABASE_URL"}},
+					&cli.StringFlag{Name: "regression-db-url", Usage: "Target database connection URL", Required: true, EnvVars: []string{"REGRESSION_DATABASE_URL"}},
+					&cli.StringFlag{Name: "db-name", Usage: "Regression test database name", Required: true},
 				},
 				Action: func(c *cli.Context) error {
 					ownerDatabaseURL := c.String("owner-db-url")
-					devDatabaseURL := c.String("dev-db-url")
-					testDatabaseName := c.String("test-db-name")
+					devDatabaseURL := c.String("regression-db-url")
+					regressionDatabaseName := c.String("db-name")
+
+					if ownerDatabaseURL == "" {
+						return fmt.Errorf("owner-db-url is required")
+					}
+
+					if devDatabaseURL == "" {
+						return fmt.Errorf("regression-db-url is required")
+					}
+
+					if regressionDatabaseName == "" {
+						return fmt.Errorf("regression-db-name is required")
+					}
 
 					ownerDB, err := getGorm(ownerDatabaseURL, getGormFromURL)
 					if err != nil {
 						return fmt.Errorf("failed to open database: %w", err)
 					}
-					if err = DeleteDatabase(ownerDB, testDatabaseName); err != nil {
+					if err = DeleteDatabase(ownerDB, regressionDatabaseName); err != nil {
 						return err
 					}
-					if err = CreateDatabase(ownerDB, testDatabaseName); err != nil {
+					if err = CreateDatabase(ownerDB, regressionDatabaseName); err != nil {
 						return err
 					}
 
@@ -249,7 +261,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 
 					printMigrationStatus(devDB, migrations, true)
 
-					fmt.Println("✅ Test complete, migration all up and all down, and migrate again, all pass.")
+					fmt.Println("✅ Regression test complete, migration all up and all down, and migrate again, all pass.")
 
 					os.Exit(0)
 					return nil

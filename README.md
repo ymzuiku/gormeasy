@@ -17,7 +17,7 @@ go get github.com/ymzuiku/gormeasy
 - 🔄 Rollback support (single, all, or to specific migration)
 - 🗄️ Database creation and deletion
 - 🤖 GORM model generation from database schema
-- ✅ Migration testing utilities
+- ✅ Migration regression testing utilities
 
 ## Development Workflow
 
@@ -211,7 +211,7 @@ Create a database if it does not exist. **Note:** This command is primarily desi
 **Flags:**
 
 - `--db-name` (required): Name of the database to create
-- `--owner-db-url` (optional): Database connection URL with permissions to create databases (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--owner-db-url` (optional): Database connection URL with permissions to create databases (defaults to `DATABASE_URL` env var, or can use `OWNER_DATABASE_URL` env var)
 
 ### `delete-db`
 
@@ -224,7 +224,7 @@ Delete a database if it exists. **Note:** This command is primarily designed for
 **Flags:**
 
 - `--db-name` (required): Name of the database to delete
-- `--owner-db-url` (required): Database connection URL with permissions to delete databases (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--owner-db-url` (required): Database connection URL with permissions to delete databases (defaults to `DATABASE_URL` env var, or can use `OWNER_DATABASE_URL` env var)
 
 ### `up`
 
@@ -236,7 +236,7 @@ Run all pending migrations.
 
 **Flags:**
 
-- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var)
 - `--no-exit` (optional): When successful, do not exit (useful for programmatic usage)
 
 **Example:**
@@ -263,7 +263,7 @@ Rollback migrations. By default, rolls back the last migration.
 
 **Flags:**
 
-- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var)
 - `--id` (optional): Rollback to specific migration ID
 - `--all` (optional): Rollback all migrations
 
@@ -277,7 +277,7 @@ Show the current migration status (applied and pending migrations).
 
 **Flags:**
 
-- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var)
 
 **Output:**
 
@@ -301,14 +301,14 @@ Generate GORM models from your database schema.
 
 **Flags:**
 
-- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--db-url` (optional): Database connection URL (defaults to `DATABASE_URL` env var)
 - `--out` (required): Output path for generated models
 
-### `test`
+### `regression`
 
-Test all migrations by running them in a specified test database. This command performs a complete migration cycle to verify that all migrations work correctly:
+Run regression test for all migrations by running them in a specified test database. This command performs a complete migration cycle to verify that all migrations work correctly:
 
-1. **Creates a test database** with the specified name (deletes it first if it exists)
+1. **Creates a regression test database** with the specified name (deletes it first if it exists)
 2. **Runs all migrations** (first time)
 3. **Rolls back all migrations**
 4. **Runs all migrations again** (second time)
@@ -321,39 +321,39 @@ This ensures that:
 - The migration system is idempotent
 
 ```bash
-./your-app test \
+./your-app regression \
   --owner-db-url postgres://user:password@localhost:5432/postgres \
-  --test-db-url postgres://user:password@localhost:5432/testdb \
-  --test-db-name testdb
+  --regression-db-url postgres://user:password@localhost:5432/regression_db \
+  --db-name regression_db
 ```
 
 **Flags:**
 
-- `--owner-db-url` (required): Database connection URL with permissions to create/delete databases (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
-- `--test-db-url` (required): Target test database connection URL (can also use `TARGET_DATABASE_URL` env var)
-- `--test-db-name` (required): Name of the test database to create and use for testing
+- `--owner-db-url` (required): Database connection URL with permissions to create/delete databases (defaults to `DATABASE_URL` env var, or can use `OWNER_DATABASE_URL` env var)
+- `--regression-db-url` (required): Target regression test database connection URL (can also use `TARGET_DATABASE_URL` env var)
+- `--regression-db-name` (required): Name of the regression test database to create and use for testing
 
 **Example:**
 
 ```bash
-# Test migrations in a dedicated test database
-go run main.go test \
+# Run regression test for migrations in a dedicated test database
+go run main.go regression \
   --owner-db-url postgres://postgres:password@localhost:5432/postgres \
-  --test-db-url postgres://postgres:password@localhost:5432/migration_test \
-  --test-db-name migration_test
+  --regression-db-url postgres://postgres:password@localhost:5432/migration_regression \
+  --regression-db-name migration_regression
 ```
 
 **What happens:**
 
-1. The test database `migration_test` is deleted if it exists
-2. A new `migration_test` database is created
+1. The regression test database `migration_regression` is deleted if it exists
+2. A new `migration_regression` database is created
 3. All migrations from `internal/migration.go` are applied (first time)
 4. Migration status is displayed
 5. All migrations are rolled back
 6. Migration status is displayed again
 7. All migrations are applied again (second time)
 8. Final migration status is displayed
-9. Success message: "✅ Test complete, migration all up and all down, and migrate again, all pass."
+9. Success message: "✅ Regression test complete, migration all up and all down, and migrate again, all pass."
 
 **Use cases:**
 

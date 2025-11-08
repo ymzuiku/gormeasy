@@ -36,7 +36,7 @@ gen:
 	@go run example/main.go gen --out=generated/model
 
 test:
-	@go run example/main.go test --test-db-name=migrate_test --owner-db-url=postgres://postgres:the_password@localhost:9433/postgres?sslmode=disable --test-db-url=postgres://postgres:the_password@localhost:9433/migrate_test?sslmode=disable
+	@go run example/main.go regression --db-name=migrate_test --owner-db-url=postgres://postgres:the_password@localhost:9433/postgres?sslmode=disable --regression-db-url=postgres://postgres:the_password@localhost:9433/migrate_test?sslmode=disable
 
 
 again:
