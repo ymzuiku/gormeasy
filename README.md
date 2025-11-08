@@ -19,38 +19,24 @@ go get github.com/ymzuiku/gormeasy
 - 🤖 GORM model generation from database schema
 - ✅ Migration testing utilities
 
-## Quick Start
+## Development Workflow
 
-### 1. Setup Your Project
+Gorm Easy follows a **database-first** development approach where migrations are the single source of truth for your database schema. Here's the complete workflow to get started:
 
-Create a main file that initializes Gorm Easy:
+### Project Setup
+
+First, create a main file that initializes Gorm Easy:
 
 ```go
+// main.go
 package main
 
 import (
-    "fmt"
     "log"
-    "net/http"
     "github.com/ymzuiku/gormeasy"
     "gorm.io/driver/postgres"  // or mysql, sqlite, sqlserver, etc.
     "gorm.io/gorm"
 )
-
-func getMigrations() []*gormeasy.Migration {
-    return []*gormeasy.Migration{
-        {
-            ID: "20240101000000-create-users",
-            Migrate: func(tx *gorm.DB) error {
-                // Your migration logic here
-                return tx.AutoMigrate(&User{})
-            },
-            Rollback: func(tx *gorm.DB) error {
-                return gormeasy.DropTable(tx, "users")
-            },
-        },
-    }
-}
 
 func main() {
     if err := gormeasy.Start(getMigrations(), func(url string) (*gorm.DB, error) {
@@ -62,20 +48,11 @@ func main() {
         log.Fatalf("failed to start gormeasy: %v", err)
     }
 
-    // After gormeasy commands complete, start your application server
-    // This allows you to run migrations and then start your HTTP server
-    http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-        fmt.Fprintf(w, "pong")
-    })
-
-    log.Println("Server starting on :8080")
-    if err := http.ListenAndServe(":8080", nil); err != nil {
-        log.Fatalf("failed to start server: %v", err)
-    }
+    // Your application code continues here after migrations
 }
 ```
 
-### 2. Configure Environment
+### Configure Environment
 
 Create a `.env` file or set environment variables. The default environment variable is `DATABASE_URL`:
 
@@ -91,6 +68,134 @@ DATABASE_URL=sqlite.db
 ```
 
 **Note:** You can also use `--db-url` flag to override the environment variable for specific commands.
+
+### 1. Define Migrations (Single Source of Truth)
+
+Create `internal/migration.go` as the **global unique data source** for your ORM. This file contains all your migration definitions:
+
+```go
+// internal/migration.go
+package internal
+
+import (
+    "time"
+    "github.com/ymzuiku/gormeasy"
+    "gorm.io/gorm"
+)
+
+func GetMigrations() []*gormeasy.Migration {
+    return []*gormeasy.Migration{
+        {
+            ID: "20240101000000-create-users",
+            Migrate: func(tx *gorm.DB) error {
+                // Define your schema changes here
+                type User struct {
+                    ID        uint      `gorm:"primaryKey"`
+                    Name      string    `gorm:"type:varchar(100)"`
+                    Email     string    `gorm:"type:varchar(255);uniqueIndex"`
+                    CreatedAt time.Time
+                    UpdatedAt time.Time
+                }
+                return tx.AutoMigrate(&User{})
+            },
+            Rollback: func(tx *gorm.DB) error {
+                return gormeasy.DropTable(tx, "users")
+            },
+        },
+        // Add more migrations...
+    }
+}
+```
+
+### 2. Run Database Migrations
+
+Apply migrations to your database:
+
+```bash
+# Run all pending migrations
+go run main.go up
+```
+
+This will:
+
+- Execute all pending migrations from `internal/migration.go`
+- Update the database schema
+- Track applied migrations in the `migrations` table
+
+### 3. Generate GORM Models from Database
+
+After migrations are applied, generate GORM model structs from the actual database schema:
+
+```bash
+# Generate models from database to generated/model directory
+go run main.go gen --out=generated/model
+```
+
+This command:
+
+- Connects to your database
+- Inspects the current schema
+- Generates GORM model structs matching your database tables
+- Saves them to `generated/model/` directory
+
+**Important:** Always run `gen` after running `up` to keep your generated models in sync with the database.
+
+### 4. Use Generated Models in Development
+
+In your application code, import and use the generated models:
+
+```go
+// main.go or your service files
+package main
+
+import (
+    "your-project/generated/model"
+    "gorm.io/gorm"
+)
+
+func GetUserByEmail(db *gorm.DB, email string) (*model.User, error) {
+    var user model.User
+    err := db.Where("email = ?", email).First(&user).Error
+    return &user, err
+}
+```
+
+### Complete Workflow Example
+
+```bash
+# 1. Define your migration in internal/migration.go
+# (Edit the file to add/modify migrations)
+
+# 2. Apply migrations to database
+go run main.go up
+
+# 3. Generate GORM models from database
+go run main.go gen --out=generated/model
+
+# 4. Use generated models in your code
+# (Import and use models from generated/model package)
+```
+
+### Workflow Benefits
+
+- **Single Source of Truth**: `internal/migration.go` is the only place where you define schema changes
+- **Type Safety**: Generated models ensure your Go code matches the database schema
+- **Version Control**: Migrations are tracked and can be rolled back if needed
+- **Team Collaboration**: Everyone follows the same migration → generate → use workflow
+
+### Project Structure
+
+```
+your-project/
+├── internal/
+│   └── migration.go          # Single source of truth for schema
+├── generated/
+│   └── model/                # Auto-generated GORM models
+│       ├── user.gen.go
+│       └── order.gen.go
+├── main.go                   # Your application entry point
+└── .env                      # Database configuration
+```
 
 ## Commands
 
@@ -200,7 +305,19 @@ Generate GORM models from your database schema.
 
 ### `test`
 
-Test all migrations by running them up, rolling back, and running them again. This command creates a test database, runs migrations, and verifies rollback functionality.
+Test all migrations by running them in a specified test database. This command performs a complete migration cycle to verify that all migrations work correctly:
+
+1. **Creates a test database** with the specified name (deletes it first if it exists)
+2. **Runs all migrations** (first time)
+3. **Rolls back all migrations**
+4. **Runs all migrations again** (second time)
+
+This ensures that:
+
+- All migrations can be applied successfully
+- All rollbacks work correctly
+- Migrations can be re-applied after rollback
+- The migration system is idempotent
 
 ```bash
 ./your-app test \
@@ -211,9 +328,37 @@ Test all migrations by running them up, rolling back, and running them again. Th
 
 **Flags:**
 
-- `--owner-db-url` (required): Database connection URL with permissions to create databases (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
+- `--owner-db-url` (required): Database connection URL with permissions to create/delete databases (defaults to `DATABASE_URL` env var, or can use `DEV_DATABASE_URL` env var)
 - `--test-db-url` (required): Target test database connection URL (can also use `TARGET_DATABASE_URL` env var)
-- `--test-db-name` (required): Name of the test database to create
+- `--test-db-name` (required): Name of the test database to create and use for testing
+
+**Example:**
+
+```bash
+# Test migrations in a dedicated test database
+go run main.go test \
+  --owner-db-url postgres://postgres:password@localhost:5432/postgres \
+  --test-db-url postgres://postgres:password@localhost:5432/migration_test \
+  --test-db-name migration_test
+```
+
+**What happens:**
+
+1. The test database `migration_test` is deleted if it exists
+2. A new `migration_test` database is created
+3. All migrations from `internal/migration.go` are applied (first time)
+4. Migration status is displayed
+5. All migrations are rolled back
+6. Migration status is displayed again
+7. All migrations are applied again (second time)
+8. Final migration status is displayed
+9. Success message: "✅ Test complete, migration all up and all down, and migrate again, all pass."
+
+**Use cases:**
+
+- **CI/CD pipelines**: Automatically test migrations before deployment
+- **Development**: Verify migrations work correctly before applying to production
+- **Team collaboration**: Ensure all team members' migrations are compatible
 
 ## Example
 
@@ -275,7 +420,6 @@ make install-hooks
 ### Update Dependencies
 
 ```bash
-go mod tidy
 go get -u ./...
 go mod tidy
 ```
