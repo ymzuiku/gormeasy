@@ -3,11 +3,17 @@ MAKEFLAGS += --no-print-directory
 DB_NAME := gormeasy_example
 
 
-# Install git hooks
-install-hooks:
-	@chmod +x scripts/install-git-hooks.sh
-	@./scripts/install-git-hooks.sh
+RAW_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^[^0-9]*//')
+VERSION := $(or $(RAW_TAG),0.0.0)
+NEXT_VERSION := $(shell echo $(VERSION) | awk -F. '{printf "%d.%d.%d", $$1, $$2, $$3+1}')
 
+.PHONY: tag
+tag:
+	@echo "Current version: $(VERSION)"
+	@echo "Creating new version tag: v$(NEXT_VERSION)"
+	git tag -a v$(NEXT_VERSION) -m "Release v$(NEXT_VERSION)"
+	git push origin v$(NEXT_VERSION)
+	@echo "✅ Tag v$(NEXT_VERSION) pushed to remote repository"
 
 lint:	
 	@command -v gopls >/dev/null 2>&1 || { \
