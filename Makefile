@@ -16,6 +16,7 @@ lint:
 	}
 	@echo "🔍 Running gopls check..."
 	@gopls check $$(find . -name '*.go' -type f -not -path "./ent/*" -not -path "./vendor/*")
+	@go test ./...
 
 
 reset-db:

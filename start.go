@@ -116,7 +116,7 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 					if err != nil {
 						return fmt.Errorf("failed to open database: %w", err)
 					}
-					err = runMigrateWithDiff(db, migrations)
+					err = RunMigrations(db, migrations)
 					if err != nil {
 						printMigrationStatus(db, migrations, false)
 						return err

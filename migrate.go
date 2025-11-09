@@ -33,8 +33,8 @@ func getMigrator(db *gorm.DB, migrations []*Migration) *gormigrate.Gormigrate {
 	}, migrations)
 }
 
-// runMigrateWithDiff executes migrations and compares the differences before and after execution.
-func runMigrateWithDiff(db *gorm.DB, migrations []*Migration) error {
+// RunMigrations executes migrations and compares the differences before and after execution.
+func RunMigrations(db *gorm.DB, migrations []*Migration) error {
 	if err := db.AutoMigrate(&MigrationsHistory{}); err != nil {
 		return fmt.Errorf("failed to migrate migrations table: %w", err)
 	}
