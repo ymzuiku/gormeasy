@@ -211,7 +211,7 @@ Create a database if it does not exist. **Note:** This command is primarily desi
 **Flags:**
 
 - `--db-name` (required): Name of the database to create
-- `--owner-db-url` (optional): Database connection URL with permissions to create databases (defaults to `DATABASE_URL` env var, or can use `OWNER_DATABASE_URL` env var)
+- `--owner-db-url` (optional): Database connection URL with permissions to create databases (defaults to `OWNER_DATABASE_URL` env var)
 
 ### `delete-db`
 
@@ -224,7 +224,7 @@ Delete a database if it exists. **Note:** This command is primarily designed for
 **Flags:**
 
 - `--db-name` (required): Name of the database to delete
-- `--owner-db-url` (required): Database connection URL with permissions to delete databases (defaults to `DATABASE_URL` env var, or can use `OWNER_DATABASE_URL` env var)
+- `--owner-db-url` (required): Database connection URL with permissions to delete databases (defaults to `OWNER_DATABASE_URL` env var)
 
 ### `up`
 
@@ -329,9 +329,9 @@ This ensures that:
 
 **Flags:**
 
-- `--owner-db-url` (required): Database connection URL with permissions to create/delete databases (defaults to `DATABASE_URL` env var, or can use `OWNER_DATABASE_URL` env var)
-- `--regression-db-url` (required): Target regression test database connection URL (can also use `TARGET_DATABASE_URL` env var)
-- `--regression-db-name` (required): Name of the regression test database to create and use for testing
+- `--owner-db-url` (required): Database connection URL with permissions to create/delete databases (defaults to `OWNER_DATABASE_URL` env var)
+- `--regression-db-url` (required): Target regression test database connection URL (defaults to `REGRESSION_DATABASE_URL` env var)
+- `--db-name` (required): Name of the regression test database to create and use for testing
 
 **Example:**
 
@@ -340,7 +340,7 @@ This ensures that:
 go run main.go regression \
   --owner-db-url postgres://postgres:password@localhost:5432/postgres \
   --regression-db-url postgres://postgres:password@localhost:5432/migration_regression \
-  --regression-db-name migration_regression
+  --db-name migration_regression
 ```
 
 **What happens:**
