@@ -437,9 +437,9 @@ Gorm Easy is built on top of the following excellent libraries:
 
 ### Supporting Libraries
 
-- **[urfave/cli](https://github.com/urfave/cli)** - CLI framework for building command-line applications
 - **[godotenv](https://github.com/joho/godotenv)** - Loads environment variables from `.env` files
 - **[GORM Drivers](https://gorm.io/docs/connecting_to_the_database.html)** - Database drivers for PostgreSQL, MySQL, SQLite, SQL Server, and more
+- **Go standard library `flag`** - Command-line flag parsing (built-in, no external dependency)
 
 ### Links
 

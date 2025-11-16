@@ -1,12 +1,11 @@
 package gormeasy
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/joho/godotenv"
-	"github.com/urfave/cli/v2"
 	"gorm.io/gorm"
 )
 
@@ -33,277 +32,287 @@ func Start(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error
 		fmt.Printf("Warning: .env file not found: %v\n", err)
 	}
 
-	// Check if help is explicitly requested
-	showHelp := false
-	for _, arg := range os.Args[1:] {
-		if arg == "--help" || arg == "-h" || arg == "help" {
-			showHelp = true
-			break
-		}
+	// If no arguments provided, silently return to allow the application to continue
+	if len(os.Args) < 2 {
+		return nil
 	}
 
-	app := &cli.App{
-		Name:     "easymigrate",
-		Usage:    "Manage PostgreSQL databases and migrations",
-		HideHelp: !showHelp, // Only hide help if not explicitly requested
-		Action: func(c *cli.Context) error {
-			// When no command is provided, silently return to allow the application to continue
-			return nil
-		},
-		Commands: []*cli.Command{
-			{
-				Name:  "create-db",
-				Usage: "Create a PostgreSQL database if it does not exist",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-name", Usage: "Name of the database to create", Required: true},
-					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"OWNER_DATABASE_URL"}},
-				},
-				Action: func(c *cli.Context) error {
-					databaseURL := c.String("owner-db-url")
-					dbName := c.String("db-name")
-					db, err := getGorm(databaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
+	command := os.Args[1]
 
-					if err := CreateDatabase(db, dbName); err != nil {
-						return err
-					}
-
-					os.Exit(0)
-
-					return nil
-				},
-			},
-			{
-				Name:  "delete-db",
-				Usage: "Delete a PostgreSQL database if it exists",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-name", Usage: "Name of the database to delete", Required: true},
-					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: true, EnvVars: []string{"OWNER_DATABASE_URL"}},
-				},
-				Action: func(c *cli.Context) error {
-
-					databaseURL := c.String("owner-db-url")
-					dbName := c.String("db-name")
-
-					db, err := getGorm(databaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
-
-					if err := DeleteDatabase(db, dbName); err != nil {
-						return err
-					}
-
-					os.Exit(0)
-
-					return nil
-				},
-			},
-			{
-				Name:  "up",
-				Usage: "Migrate the database up",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
-					&cli.BoolFlag{Name: "no-exit", Usage: "When success, do not exit", Required: false},
-				},
-				Action: func(c *cli.Context) error {
-					noExit := c.Bool("no-exit")
-					databaseURL := c.String("db-url")
-
-					db, err := getGorm(databaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
-					err = RunMigrations(db, migrations)
-					if err != nil {
-						printMigrationStatus(db, migrations, false)
-						return err
-					}
-					printMigrationStatus(db, migrations, false)
-					if !noExit {
-						os.Exit(0)
-					}
-					return nil
-				},
-			},
-			{
-				Name:  "down",
-				Usage: "Migrate the database down",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
-					&cli.StringFlag{Name: "id", Usage: "Rollback to specific migration ID", Required: false},
-					&cli.BoolFlag{Name: "all", Usage: "Rollback all migrations", Required: false},
-				},
-				Action: func(c *cli.Context) error {
-					all := c.Bool("all")
-					id := c.String("id")
-					databaseURL := c.String("db-url")
-
-					db, err := getGorm(databaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
-					m := getMigrator(db, migrations)
-					if id != "" {
-						if err := m.RollbackTo(id); err != nil {
-							printMigrationStatus(db, migrations, false)
-							return fmt.Errorf("failed to rollback to migration: %w", err)
-						}
-						fmt.Printf("✅ Rollback to migration: %s complete.\n", id)
-					} else if all {
-						if err := rollbackAllMigrations(m); err != nil {
-							printMigrationStatus(db, migrations, false)
-							return fmt.Errorf("failed to rollback all migrations: %w", err)
-						}
-						fmt.Printf("✅ Rollback all migrations complete.\n")
-					} else {
-						if err := m.RollbackLast(); err != nil {
-							printMigrationStatus(db, migrations, false)
-							return fmt.Errorf("rollback failed: %w", err)
-						}
-						fmt.Println("✅ Rollback last complete.")
-					}
-					printMigrationStatus(db, migrations, false)
-					os.Exit(0)
-					return nil
-				},
-			},
-			{
-				Name:  "gen",
-				Usage: "Generate GORM models from database",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
-					&cli.StringFlag{Name: "out", Usage: "Output path for generated models", Required: true},
-				},
-				Action: func(c *cli.Context) error {
-					databaseURL := c.String("db-url")
-					out := c.String("out")
-
-					db, err := getGorm(databaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
-					if err := generateGormCode(db, out); err != nil {
-						return fmt.Errorf("failed to generate GORM code: %w", err)
-					}
-					os.Exit(0)
-					return nil
-				},
-			},
-			{
-				Name:  "status",
-				Usage: "Show the current migration status",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "db-url", Usage: "Development database connection URL", Required: false, EnvVars: []string{"DATABASE_URL"}},
-				},
-				Action: func(c *cli.Context) error {
-					databaseURL := c.String("db-url")
-
-					db, err := getGorm(databaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
-					printMigrationStatus(db, migrations, false)
-					os.Exit(0)
-					return nil
-				},
-			},
-			{
-				Name:  "regression",
-				Usage: "Run regression test for all migrations and rollbacks",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "owner-db-url", Usage: "Development database connection URL", Required: true, EnvVars: []string{"OWNER_DATABASE_URL"}},
-					&cli.StringFlag{Name: "regression-db-url", Usage: "Target database connection URL", Required: true, EnvVars: []string{"REGRESSION_DATABASE_URL"}},
-					&cli.StringFlag{Name: "db-name", Usage: "Regression test database name", Required: true},
-				},
-				Action: func(c *cli.Context) error {
-					ownerDatabaseURL := c.String("owner-db-url")
-					devDatabaseURL := c.String("regression-db-url")
-					regressionDatabaseName := c.String("db-name")
-
-					if ownerDatabaseURL == "" {
-						return fmt.Errorf("owner-db-url is required")
-					}
-
-					if devDatabaseURL == "" {
-						return fmt.Errorf("regression-db-url is required")
-					}
-
-					if regressionDatabaseName == "" {
-						return fmt.Errorf("regression-db-name is required")
-					}
-
-					ownerDB, err := getGorm(ownerDatabaseURL, getGormFromURL)
-					if err != nil {
-						return fmt.Errorf("failed to open database: %w", err)
-					}
-					if err = DeleteDatabase(ownerDB, regressionDatabaseName); err != nil {
-						return err
-					}
-					if err = CreateDatabase(ownerDB, regressionDatabaseName); err != nil {
-						return err
-					}
-
-					devDB, err := getGorm(devDatabaseURL, getGormFromURL)
-					if err != nil {
-						return err
-					}
-					m := getMigrator(devDB, migrations)
-
-					if err = m.Migrate(); err != nil {
-						return fmt.Errorf("failed to migrate database: %w", err)
-					}
-					printMigrationStatus(devDB, migrations, true)
-
-					if err = rollbackAllMigrations(m); err != nil {
-						return fmt.Errorf("failed to rollback all migrations: %w", err)
-					}
-					printMigrationStatus(devDB, migrations, true)
-
-					if err = m.Migrate(); err != nil {
-						return fmt.Errorf("failed to migrate again database: %w", err)
-					}
-
-					printMigrationStatus(devDB, migrations, true)
-
-					fmt.Println("✅ Regression test complete, migration all up and all down, and migrate again, all pass.")
-
-					os.Exit(0)
-					return nil
-				},
-			},
-		},
-	}
-
-	if err := app.Run(os.Args); err != nil {
-		errStr := err.Error()
-		// If help was explicitly requested, show help and exit
-		if showHelp && strings.Contains(errStr, "help requested") {
-			// Show help by running help command
-			helpArgs := []string{os.Args[0], "help"}
-			if helpErr := app.Run(helpArgs); helpErr != nil {
-				// If help command also fails, just exit
-				os.Exit(1)
-			}
-			os.Exit(0)
-		}
-		// Suppress help-related errors and unknown command errors when no command is provided
-		if strings.Contains(errStr, "flag provided but not defined") ||
-			strings.Contains(errStr, "No help topic") ||
-			(strings.Contains(errStr, "command") && strings.Contains(errStr, "not found")) {
-			// Silently return for unknown command errors (but not explicit help requests)
-			return nil
-		}
-		fmt.Println("Error:", err)
-		return err
-	}
-
-	// If help was requested and app.Run succeeded (help was shown), exit
-	if showHelp {
+	// Handle help
+	if command == "help" || command == "--help" || command == "-h" {
+		printHelp()
 		os.Exit(0)
 	}
 
+	// Parse command-specific flags
+	switch command {
+	case "create-db":
+		return handleCreateDB(getGormFromURL)
+	case "delete-db":
+		return handleDeleteDB(getGormFromURL)
+	case "up":
+		return handleUp(migrations, getGormFromURL)
+	case "down":
+		return handleDown(migrations, getGormFromURL)
+	case "gen":
+		return handleGen(getGormFromURL)
+	case "status":
+		return handleStatus(migrations, getGormFromURL)
+	case "regression":
+		return handleRegression(migrations, getGormFromURL)
+	default:
+		// Unknown command, silently return to allow the application to continue
+		return nil
+	}
+}
+
+func printHelp() {
+	fmt.Println("easymigrate - Manage PostgreSQL databases and migrations")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  create-db    Create a PostgreSQL database if it does not exist")
+	fmt.Println("  delete-db    Delete a PostgreSQL database if it exists")
+	fmt.Println("  up           Migrate the database up")
+	fmt.Println("  down         Migrate the database down")
+	fmt.Println("  gen          Generate GORM models from database")
+	fmt.Println("  status       Show the current migration status")
+	fmt.Println("  regression   Run regression test for all migrations and rollbacks")
+	fmt.Println()
+	fmt.Println("Use 'command -h' for command-specific help")
+}
+
+func handleCreateDB(getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("create-db", flag.ExitOnError)
+	dbName := fs.String("db-name", "", "Name of the database to create")
+	ownerDBURL := fs.String("owner-db-url", os.Getenv("OWNER_DATABASE_URL"), "Development database connection URL")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s create-db [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	if *dbName == "" {
+		return fmt.Errorf("db-name is required")
+	}
+
+	db, err := getGorm(*ownerDBURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+
+	if err := CreateDatabase(db, *dbName); err != nil {
+		return err
+	}
+
+	os.Exit(0)
+	return nil
+}
+
+func handleDeleteDB(getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("delete-db", flag.ExitOnError)
+	dbName := fs.String("db-name", "", "Name of the database to delete")
+	ownerDBURL := fs.String("owner-db-url", os.Getenv("OWNER_DATABASE_URL"), "Development database connection URL")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s delete-db [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	if *dbName == "" {
+		return fmt.Errorf("db-name is required")
+	}
+	if *ownerDBURL == "" {
+		return fmt.Errorf("owner-db-url is required")
+	}
+
+	db, err := getGorm(*ownerDBURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+
+	if err := DeleteDatabase(db, *dbName); err != nil {
+		return err
+	}
+
+	os.Exit(0)
+	return nil
+}
+
+func handleUp(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("up", flag.ExitOnError)
+	databaseURL := fs.String("db-url", os.Getenv("DATABASE_URL"), "Development database connection URL")
+	noExit := fs.Bool("no-exit", false, "When success, do not exit")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s up [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	db, err := getGorm(*databaseURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	err = RunMigrations(db, migrations)
+	if err != nil {
+		printMigrationStatus(db, migrations, false)
+		return err
+	}
+	printMigrationStatus(db, migrations, false)
+	if !*noExit {
+		os.Exit(0)
+	}
+	return nil
+}
+
+func handleDown(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("down", flag.ExitOnError)
+	databaseURL := fs.String("db-url", os.Getenv("DATABASE_URL"), "Development database connection URL")
+	id := fs.String("id", "", "Rollback to specific migration ID")
+	all := fs.Bool("all", false, "Rollback all migrations")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s down [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	db, err := getGorm(*databaseURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	m := getMigrator(db, migrations)
+	if *id != "" {
+		if err := m.RollbackTo(*id); err != nil {
+			printMigrationStatus(db, migrations, false)
+			return fmt.Errorf("failed to rollback to migration: %w", err)
+		}
+		fmt.Printf("✅ Rollback to migration: %s complete.\n", *id)
+	} else if *all {
+		if err := rollbackAllMigrations(m); err != nil {
+			printMigrationStatus(db, migrations, false)
+			return fmt.Errorf("failed to rollback all migrations: %w", err)
+		}
+		fmt.Printf("✅ Rollback all migrations complete.\n")
+	} else {
+		if err := m.RollbackLast(); err != nil {
+			printMigrationStatus(db, migrations, false)
+			return fmt.Errorf("rollback failed: %w", err)
+		}
+		fmt.Println("✅ Rollback last complete.")
+	}
+	printMigrationStatus(db, migrations, false)
+	os.Exit(0)
+	return nil
+}
+
+func handleGen(getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("gen", flag.ExitOnError)
+	databaseURL := fs.String("db-url", os.Getenv("DATABASE_URL"), "Development database connection URL")
+	out := fs.String("out", "", "Output path for generated models")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s gen [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	if *out == "" {
+		return fmt.Errorf("out is required")
+	}
+
+	db, err := getGorm(*databaseURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	if err := generateGormCode(db, *out); err != nil {
+		return fmt.Errorf("failed to generate GORM code: %w", err)
+	}
+	os.Exit(0)
+	return nil
+}
+
+func handleStatus(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	databaseURL := fs.String("db-url", os.Getenv("DATABASE_URL"), "Development database connection URL")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s status [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	db, err := getGorm(*databaseURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	printMigrationStatus(db, migrations, false)
+	os.Exit(0)
+	return nil
+}
+
+func handleRegression(migrations []*Migration, getGormFromURL func(string) (*gorm.DB, error)) error {
+	fs := flag.NewFlagSet("regression", flag.ExitOnError)
+	ownerDatabaseURL := fs.String("owner-db-url", os.Getenv("OWNER_DATABASE_URL"), "Development database connection URL")
+	devDatabaseURL := fs.String("regression-db-url", os.Getenv("REGRESSION_DATABASE_URL"), "Target database connection URL")
+	regressionDatabaseName := fs.String("db-name", "", "Regression test database name")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s regression [options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(os.Args[2:])
+
+	if *ownerDatabaseURL == "" {
+		return fmt.Errorf("owner-db-url is required")
+	}
+
+	if *devDatabaseURL == "" {
+		return fmt.Errorf("regression-db-url is required")
+	}
+
+	if *regressionDatabaseName == "" {
+		return fmt.Errorf("db-name is required")
+	}
+
+	ownerDB, err := getGorm(*ownerDatabaseURL, getGormFromURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	if err = DeleteDatabase(ownerDB, *regressionDatabaseName); err != nil {
+		return err
+	}
+	if err = CreateDatabase(ownerDB, *regressionDatabaseName); err != nil {
+		return err
+	}
+
+	devDB, err := getGorm(*devDatabaseURL, getGormFromURL)
+	if err != nil {
+		return err
+	}
+	m := getMigrator(devDB, migrations)
+
+	if err = m.Migrate(); err != nil {
+		return fmt.Errorf("failed to migrate database: %w", err)
+	}
+	printMigrationStatus(devDB, migrations, true)
+
+	if err = rollbackAllMigrations(m); err != nil {
+		return fmt.Errorf("failed to rollback all migrations: %w", err)
+	}
+	printMigrationStatus(devDB, migrations, true)
+
+	if err = m.Migrate(); err != nil {
+		return fmt.Errorf("failed to migrate again database: %w", err)
+	}
+
+	printMigrationStatus(devDB, migrations, true)
+
+	fmt.Println("✅ Regression test complete, migration all up and all down, and migrate again, all pass.")
+
+	os.Exit(0)
 	return nil
 }
