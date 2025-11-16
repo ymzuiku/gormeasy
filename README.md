@@ -1,3 +1,5 @@
+[English](README.md) | [中文](README-zh.md)
+
 # Gorm Easy
 
 A simple and easy-to-use database migration tool for GORM, built on top of [gormigrate](https://pkg.go.dev/github.com/go-gormigrate/gormigrate/v2). Gorm Easy provides a CLI interface to manage database migrations with ease. It supports all databases that GORM supports, including PostgreSQL, MySQL, SQLite, SQL Server, and more.
